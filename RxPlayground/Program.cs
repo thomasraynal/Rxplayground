@@ -132,7 +132,7 @@ namespace RxPlayground
             subject.LogToConsole();
         }
 
-        public void ReplaySubject()
+        public static void ReplaySubject()
         {
             var cleanUp = new CompositeDisposable();
 
@@ -148,7 +148,7 @@ namespace RxPlayground
         }
 
 
-        public void Publish()
+        public static void Publish()
         {
             var stream = Observable.Create<int>((obs) =>
             {
@@ -191,7 +191,7 @@ namespace RxPlayground
         }
 
 
-        public void RefCount()
+        public static void RefCount()
         {
             var stream = Observable
                 .Interval(TimeSpan.FromMilliseconds(200))
@@ -220,7 +220,7 @@ namespace RxPlayground
         }
 
 
-        public void Agregate()
+        public static void Agregate()
         {
             var stream = Observable.Create<int>((obs) =>
             {
@@ -247,7 +247,7 @@ namespace RxPlayground
             cleanUp.Dispose();
         }
 
-        public void Combine()
+        public static void Combine()
         {
             var stream = Observable.Create<int>((obs) =>
             {
@@ -304,7 +304,7 @@ namespace RxPlayground
 
         }
 
-        public void Buffer()
+        public static void Buffer()
         {
      
             var stream = Observable.Create<int>((obs) =>
@@ -323,6 +323,39 @@ namespace RxPlayground
                  .LogToConsole();
         }
 
+        public static void ErrorHandling()
+        {
+            var obsError = Observable.Throw<String>(new Exception("failed"));
+            var obs = Observable.Create<String>((observer) =>
+            {
+                observer.OnNext("a");
+                observer.OnNext("b");
+                observer.OnNext("c");
+                observer.OnNext("d");
+                observer.OnCompleted();
+                return Disposable.Empty;
+            });
+
+            var obsError2 = Observable.Create<String>((observer) =>
+            {
+                observer.OnNext("RETRY");
+                observer.OnError(new Exception("failed"));
+                return Disposable.Empty;
+            });
+
+            obsError
+                .OnErrorResumeNext(obs)
+                .LogToConsole();
+
+            obsError2
+                .Retry(3)
+                .Finally(() =>
+                {
+                    Log.Logger.Information("FINALLY");
+                })
+                .LogToConsole();
+        }
+
         static void Main(string[] args)
         {
             Log.Logger = new LoggerConfiguration()
@@ -337,6 +370,9 @@ namespace RxPlayground
             //ImmediateScheduler
             //EventLoopScheduler
             //DispatcherScheduler
+
+            ErrorHandling();
+
 
             Console.Read();
 
