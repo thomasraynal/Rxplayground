@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -146,6 +147,182 @@ namespace RxPlayground
             cleanUp.Dispose();
         }
 
+
+        public void Publish()
+        {
+            var stream = Observable.Create<int>((obs) =>
+            {
+                for (var i = 0; i < 3; i++) obs.OnNext(i);
+
+                obs.OnCompleted();
+
+                return Disposable.Empty;
+
+            });
+
+
+            var cold = stream.Publish();
+
+
+            var cleanUp = new CompositeDisposable
+            {
+                cold.LogToConsole(),
+                cold.LogToConsole()
+            };
+
+            cold.Connect();
+
+            Thread.Sleep(1000);
+
+            cleanUp.Add(cold.LogToConsole());
+
+            var cold2 = stream.PublishLast();
+
+            cleanUp.Add(cold2.LogToConsole());
+            cleanUp.Add(cold2.LogToConsole());
+
+            cold2.Connect();
+
+            Thread.Sleep(1000);
+
+            cleanUp.Add(cold2.LogToConsole());
+
+            cleanUp.Dispose();
+        }
+
+
+        public void RefCount()
+        {
+            var stream = Observable
+                .Interval(TimeSpan.FromMilliseconds(200))
+                .Do(time => Log.Information("FROM obs {0}", time));
+
+
+            var cold = stream
+                .Publish()
+                .RefCount();
+
+            var cleanUp = new CompositeDisposable
+            {
+                cold.LogToConsole(),
+                cold.LogToConsole()
+            };
+
+            Thread.Sleep(1000);
+            cleanUp.Dispose();
+
+
+            var lastObs = cold.LogToConsole();
+
+            Thread.Sleep(1000);
+
+            lastObs.Dispose();
+        }
+
+
+        public void Agregate()
+        {
+            var stream = Observable.Create<int>((obs) =>
+            {
+                for (var i = 0; i < 10; i++) obs.OnNext(i);
+
+                obs.OnCompleted();
+
+                return Disposable.Empty;
+
+            });
+
+
+            var cleanUp = new CompositeDisposable
+            {
+            stream
+                .Aggregate((x, y) => x + y)
+                .LogToConsole(),
+
+            stream
+                .Scan((x, y) => x + y)
+                .LogToConsole(),
+            };
+
+            cleanUp.Dispose();
+        }
+
+        public void Combine()
+        {
+            var stream = Observable.Create<int>((obs) =>
+            {
+                for (var i = 0; i < 10; i++) obs.OnNext(i);
+
+                obs.OnCompleted();
+
+                return Disposable.Empty;
+
+            });
+
+            var stream2 = Observable.Create<int>((obs) =>
+            {
+                for (var i = 0; i < 10; i++) obs.OnNext(i);
+
+                obs.OnCompleted();
+
+                return Disposable.Empty;
+
+            });
+
+            var taskStream = Observable.Create<Task<int>>((obs) =>
+            {
+                var rand = new Random();
+
+                Enumerable.Range(0, 10)
+                          .Select(val => Task.Delay(TimeSpan.FromSeconds(rand.Next(0, 1))).ContinueWith(tsk => val))
+                          .ForEach(task => obs.OnNext(task));
+
+                obs.OnCompleted();
+
+                return Disposable.Empty;
+
+            });
+
+            var cleanUp = new CompositeDisposable
+            {
+
+            stream
+                .Zip(stream2,(x, y) => x + y)
+                .LogToConsole()
+            };
+
+            cleanUp.Add(stream
+                .CombineLatest(stream2, (x, y) => x + y)
+                .LogToConsole());
+
+            taskStream
+                 .Switch()
+                 .LogToConsole();
+
+
+            cleanUp.Dispose();
+
+        }
+
+        public void Buffer()
+        {
+     
+            var stream = Observable.Create<int>((obs) =>
+            {
+                for (var i = 0; i < 10; i++) obs.OnNext(i);
+
+                obs.OnCompleted();
+
+                return Disposable.Empty;
+
+            });
+
+            stream
+                 .Buffer(2, 1)
+                 .Select(buffer => buffer.Sum())
+                 .LogToConsole();
+        }
+
         static void Main(string[] args)
         {
             Log.Logger = new LoggerConfiguration()
@@ -153,6 +330,13 @@ namespace RxPlayground
                             .CreateLogger();
 
 
+            //CurrentThreadScheduler
+            //NewThreadScheduler
+            //ThreadPoolScheduler
+            //TaskPoolScheduler
+            //ImmediateScheduler
+            //EventLoopScheduler
+            //DispatcherScheduler
 
             Console.Read();
 
